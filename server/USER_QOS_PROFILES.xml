@@ -1,0 +1,181 @@
+
+<!-- RTI Data Distribution Service Deployment -->
+<dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="http://community.rti.com/schema/5.2.3/rti_dds_profiles.xsd"
+	version="5.2.3">
+
+
+	<qos_library name="ExampleLibrary">
+	    <qos_profile name="NoMulticastProfile" is_default_qos="true">
+	      <participant_qos>
+	        <discovery>
+	          <!-- disable the reception multicast for discovery  -->
+	          <multicast_receive_addresses/>
+	          <!-- Configure the destinatons of disovery announcements. Do not list any multicast addresses -->
+	          <!--This is the list of transports destinations where the participant will announce its presence -->
+	          <initial_peers>
+	            <!-- use shared memory for participants the same computer -->
+	            <element>builtin.shmem://</element>
+	            <!-- also use IP loopback for  participants the same computer -->
+	            <element>builtin.udpv4://127.0.0.1</element>
+	            <!-- list here the IP addresses of all computers where there may be participants -->
+	            <element>builtin.udpv4://192.168.171.76</element>
+	            <element>builtin.udpv4://192.168.170.19</element>
+	            <element>builtin.udpv4://192.168.170.18</element>
+	            <element>builtin.udpv4://10.3.48.30</element>
+	          </initial_peers>
+	        </discovery>
+
+	        <!-- disable the use of multicast at the UDP transport level -->
+	        <!-- see http://community.rti.com/docs/html/api_cpp/group__NDDS__Transport__UDPv4__Plugin.html -->
+	        <property>
+	          <value>
+	            <element>
+	              <name>dds.transport.UDPv4.builtin.multicast_enabled</name>
+	              <value>0</value>
+	           </element>
+	          </value>
+	        </property>
+	      </participant_qos>
+	    </qos_profile>
+	  </qos_library>
+
+
+	<!-- Qos Library -->
+	<qos_library name="qosLibrary">
+		<qos_profile name="DefaultProfile">
+
+		</qos_profile>
+
+		<qos_profile name="partitions_Profile">
+
+		<!-- In this example we set a Reliable Data Writer with a history
+				depth of 3 samples and Transient Local durability. -->
+		<datawriter_qos>
+			<reliability>
+				<kind>RELIABLE_RELIABILITY_QOS</kind>
+			</reliability>
+
+			<history>
+				<kind>KEEP_LAST_HISTORY_QOS</kind>
+				<depth>3</depth>
+			</history>
+
+			<durability>
+				<kind>TRANSIENT_LOCAL_DURABILITY_QOS</kind>
+			</durability>
+		</datawriter_qos>
+
+		<!-- And a Reliable Data Reader with keep all history and Transient
+				 local durability. -->
+		<datareader_qos>
+			<reliability>
+				<kind>RELIABLE_RELIABILITY_QOS</kind>
+			</reliability>
+
+			<history>
+				<kind>KEEP_ALL_HISTORY_QOS</kind>
+			</history>
+
+			<durability>
+				<kind>TRANSIENT_LOCAL_DURABILITY_QOS</kind>
+			</durability>
+		</datareader_qos>
+
+		<participant_qos>
+
+		</participant_qos>
+		</qos_profile>
+
+	</qos_library>
+
+
+	<!-- types -->
+	<types>
+		<const name="MAX_NAME_LEN" type="long" value="64" />
+		<const name="MAX_MSG_LEN" type="long" value="2048" />
+
+		<struct name="MensagemRTD">
+			<member name="from" type="string" key="true" stringMaxLength="MAX_NAME_LEN" />
+			<member name="to" type="string" stringMaxLength="MAX_NAME_LEN" />
+			<member name="message" type="string" stringMaxLength="MAX_MSG_LEN" />
+			<member name="count" type="long" />
+		</struct>
+	</types>
+
+	<!-- Domain Library -->
+	<domain_library name="MyDomainLibrary">
+
+		<domain name="RTD_Domain" domain_id="0">
+			<register_type name="RTD_Type" kind="dynamicData"
+				type_ref="MensagemRTD" />
+
+			<topic name="RTD_Topic" register_type_ref="RTD_Type">
+
+				<topic_qos name="HelloWorld_qos" base_name="qosLibrary::DefaultProfile" />
+			</topic>
+		</domain>
+	</domain_library>
+
+	<!-- Participant library -->
+	<participant_library name="MyParticipantLibrary">
+
+		<domain_participant name="Participante1"
+			domain_ref="MyDomainLibrary::RTD_Domain">
+
+			<publisher name="MyPublisher">
+				<data_writer name="HelloWorldWriter" topic_ref="RTD_Topic" />
+				<publisher_qos>
+					<partition>
+						<name>
+							<element>foo</element>
+						</name>
+					</partition>
+				</publisher_qos>
+			</publisher>
+
+			<subscriber name="MySubscriber">
+				<subscriber_qos>
+					<partition>
+						<name>
+							<element>foo</element>
+						</name>
+					</partition>
+				</subscriber_qos>
+				<data_reader name="HelloWorldReader" topic_ref="RTD_Topic">
+					<datareader_qos name="HelloWorld_reader_qos"
+						base_name="qosLibrary::DefaultProfile" />
+				</data_reader>
+
+			</subscriber>
+
+		</domain_participant>
+
+
+		<domain_participant name="PublicationParticipant"
+			domain_ref="MyDomainLibrary::RTD_Domain">
+
+			<publisher name="MyPublisher">
+				<data_writer name="HelloWorldWriter" topic_ref="RTD_Topic" />
+			</publisher>
+
+
+		</domain_participant>
+
+		<domain_participant name="SubscriptionParticipant"
+			domain_ref="MyDomainLibrary::RTD_Domain">
+
+			<subscriber name="MySubscriber">
+
+				<data_reader name="HelloWorldReader" topic_ref="RTD_Topic">
+					<datareader_qos name="HelloWorld_reader_qos"
+						base_name="qosLibrary::DefaultProfile" />
+				</data_reader>
+
+			</subscriber>
+
+		</domain_participant>
+
+	</participant_library>
+
+</dds>

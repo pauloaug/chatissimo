@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <title>RTD</title>
+
+  <script src="js/socket.io.js"></script>
+  <script src="js/moment-with-locales.js"></script>
+
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+  <!-- <link href="css/bootstrap-theme.min.css" rel="stylesheet"> -->
+
+  <link href="css/signin.css" rel="stylesheet">
+
+  <style>
+
+  body {
+    padding:20px;
+  }
+
+
+
+  #mensagens {
+    font-size: 16px;
+    /*margin: 20px;*/
+    height: 70vh; /* %-height of the viewport */
+    /*position: fixed;*/
+    overflow-y: scroll;
+    padding:20px;
+
+  }
+
+  #entrada{
+    padding:20px;
+  }
+
+  input{
+    /*font-size: 5 em;*/
+  }
+
+  .cinza {
+    background-color:  #e6e6e6;
+  }
+
+  .msg {
+    margin-bottom: 30px;
+  }
+
+  .timestamp-msg{
+    font-size: .7em;
+    color: gray;
+  }
+
+  .online{
+    /*font-size: 1.2em;*/
+    /*color: lime;*/
+  }
+
+  .offline{
+    visibility: hidden;
+    /*color: red;*/
+  }
+
+  #participantes {
+    font-size: 1.5em;
+    height: 70vh; /* %-height of the viewport */
+    /*position: fixed;*/
+    overflow-y: scroll;
+    padding:20px
+  }
+
+  #corpo {
+    font-size: 1.2em;
+    width:60%;
+    padding: 3px;
+  }
+
+  p {
+    white-space: pre;
+  }
+
+  label {
+    margin-left: 10px;
+  }
+
+  #app-section{
+    visibility: hidden;
+  }
+
+
+  </style>
+
+</head>
+<body>
+
+<section id="login-section">
+
+  <div class="container">
+
+    <form class="form-signin">
+      <h2 class="form-signin-heading">Login na RTD</h2>
+      <label for="inputParticipantName" class="sr-only">Nome do Participante</label>
+      <input type="text" id="inputParticipantName" class="form-control" placeholder="Nome do Participante" required autofocus>
+      <!-- <label for="inputPassword" class="sr-only">Password</label>
+      <input type="password" id="inputPassword" class="form-control" placeholder="Password" required> -->
+      <!-- <div class="checkbox">
+        <label>
+          <input type="checkbox" value="remember-me"> Remember me
+        </label>
+      </div> -->
+      <button class="btn btn-lg btn-primary btn-block" type="submit" onClick="login($('#inputParticipantName'))">Entrar</button>
+    </form>
+
+  </div> <!-- /container -->
+</section>
+
+
+<section id="app-section">
+
+  <!-- <div class="jumbotron"> -->
+  <h1>Rede Tática de Dados</h1>
+  <!-- </div> -->
+
+  <!-- <div class="container"> -->
+
+  <div id="mensagens" class="col-xs-9 well">
+  </div>
+
+  <h3 class="text-center">Participantes online:</h3>
+  <div id="participantes" class="col-xs-3">
+
+  </div>
+
+  <!-- </div> -->
+
+  <div id="entrada" class="footer navbar-fixed-bottom">
+    <form id="formulario" class="well form-inline" onsubmit="return false;">
+
+      <!-- <label for="from">De: </label>
+      <input id="from" type="text" name="from" class="input-medium form-control" placeholder="Origem"> -->
+
+      <label for="to">Para:</label>
+      <input id="to" type="text" name="to" class="input-medium form-control" placeholder="Destino">
+
+      <label for="corpo">Mensagem:</label>
+      <!-- <input id="corpo" type="text" name="corpo" class="input-xxlarge form-control" placeholder="Digite a mensagem..."> </input> -->
+      <textarea id="corpo" rows="3" name="corpo" class="form-control" placeholder="Digite a mensagem..."> </textarea>
+
+      <button type="button" onClick="enviar('foo', $('#to'), $('#corpo'))" class="btn btn-primary" id="send">Enviar</button>
+
+    </form>
+  </div>
+</section>
+
+
+  <script src="js/jquery.min.js"></script>
+  <script src="js/bootstrap.min.js"></script>
+
+
+  <script>
+  var socket = io.connect('http://127.0.0.1:9092');
+  var nome_do_participante;
+
+  socket.on('connect', function (d) {
+    myNamespace.resetaParticipantes();
+  })
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  socket.on('mensagem_do_servidor', function (d) {
+    var data = d;
+    data.from = myNamespace.getParticipanteById(d.from);
+    console.log(data);
+    contador.increment();
+
+    $("#mensagens").append(`<div class="msg"> <p style="font-size:1.3em"> ${escapeHtml(data.from)} <span class="timestamp-msg">${moment(data.timeStamp).format("HH:mm")}</span></p> <p>${escapeHtml(data.to)}  -  ${escapeHtml(data.message)} </p></div>`);
+    // $("#mensagens")[0].scrollTop = $("#mensagens")[0].scrollHeight;
+
+    $("#mensagens").scrollTop($("#mensagens")[0].scrollHeight);
+
+  });
+
+  socket.on("novo_participante", function(d) {
+    if (d.name != "RTI Connext Spy Discovery Snippet" &&
+        d.name != "RTI Administration Console") {
+      console.group();
+      console.log("-=-=-= novo participante: ");
+      console.log(d);
+      console.groupEnd();
+
+      var iguais = $.grep(myNamespace.getParticipantes().data, function(e){
+        return e.id === d.id;
+      });
+
+      console.log(iguais);
+
+      if ( iguais == null || iguais.length == 0 ) {
+        myNamespace.adicionaParticipante(d.id, d.name);
+        $("#participantes").append(`<p id=participante_${(d.id)} class="online">${d.name}</p>`);
+      };
+    }
+  })
+
+
+  socket.on("participante_saiu", function(d) {
+    console.group();
+    console.warn("-=-=-= participante saiu: ");
+    console.log(d);
+    console.groupEnd();
+
+    // myNamespace.setParticipanteOffline(d.id);
+
+    // d.name = $.grep( myNamespace.getParticipantes().data, function(e){
+    //   return e.id == d.id;
+    // })[0]["name"];
+
+    myNamespace.setParticipanteOffline(d);
+
+    // console.warn(d.name, (d.id));
+    // $("#participante_"+d.id)
+
+    $("#participante_"+(d.id)).remove();
+
+    // .removeClass("online")
+    // .addClass("offline");
+  })
+
+
+  function enviar(f, t, m) {
+    var to = t.val();
+    var message = m.val();
+
+    t.val("");
+    m.val("");
+
+    socket.emit('mensagem_do_browser',
+    {
+      "from": f,
+      "to": to,
+      "message": message
+    });
+  };
+
+
+  function login( nome ) {
+    socket.emit('login',
+  {
+    "message": nome.val()
+  });
+
+  nome_do_participante = nome;
+
+  // console.log(nome, nome.val());
+
+  // if ( $('#app-section').css('visibility') == 'hidden' )
+    $('#app-section').css('visibility','visible');
+    // else
+    // $('#app-section').css('visibility','hidden');
+
+  // if ( $('#login-section').css('visibility') == 'hidden' )
+    // $('#login-section').css('visibility','visible');
+  // else
+    $('#login-section')
+      .remove();
+    // .css('visibility','hidden');
+
+  }
+
+
+  var contador = (function () {
+    var c = 0;
+    return {
+      increment: function () {
+        c++;
+        // console.log(` =================> contador: ${c}`);
+        return c;
+      },
+      reset: function () {
+        console.log( "counter value prior to reset: " + c );
+        c = 0;
+      },
+      get: function () {
+        return c;
+      }
+    };
+  })();
+
+  $(document).keydown(function(e){
+    if(e.keyCode == 13) {
+      $('#send').click();
+    }
+  });
+
+
+
+  var myNamespace = (function () {
+
+    var participantes = { data:[] };
+
+    // A private counter variable
+    myPrivateVar = 0;
+
+    // A private function which logs any arguments
+    myPrivateMethod = function( foo ) {
+      console.log( foo );
+    };
+
+    return {
+
+      // A public variable
+      myPublicVar: "foo",
+      // participantes: { data:[] },
+
+      adicionaParticipante: function( id, name ) {
+        participantes.data.push({
+          "id": id,
+          "name": name,
+          "status": "online"
+        });
+      },
+
+      setParticipanteOffline: function( part ) {
+        participantes.data.forEach( function(p) {
+          console.log(part);
+          if (p.id == part.id) p.status = "offline";
+          console.log(p.id, part.id, "são iguais?", p.id == part.id)
+        })
+        // console.log("removido participante com id " + id);
+        console.log("participantes: ",participantes.data);
+      },
+
+      resetaParticipantes: function(d){
+        participantes = { data:[] };
+      },
+
+      getParticipantes: function() {
+        return participantes;
+      },
+
+      getParticipanteById: function( id ) {
+        console.log(participantes);
+        var result = null;
+
+        participantes.data.forEach( function(part) {
+
+          console.log(part.id, id);
+
+          if (part.id.toString() == id) {
+            console.log(" encontrei =>>", part.id, id, part);
+            result = part.name;
+          }
+
+        });
+
+        return result;
+      }
+
+    }})();
+
+//     window.onunload = function() {
+//       socket.emit('cliente_saindo',
+//       {
+//         "message": "foo"
+//       });
+// }
+
+    </script>
+
+  </body>
+  </html>
